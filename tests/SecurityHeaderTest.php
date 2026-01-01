@@ -1,0 +1,273 @@
+<?php
+
+namespace Tests;
+
+use BookStack\Util\CspService;
+use Illuminate\Testing\TestResponse;
+
+class SecurityHeaderTest extends TestCase
+{
+    public function test_cookies_samesite_lax_by_default()
+    {
+        $resp = $this->get('/');
+        foreach ($resp->headers->getCookies() as $cookie) {
+            $this->assertEquals('lax', $cookie->getSameSite());
+        }
+    }
+
+    public function test_cookies_samesite_none_when_iframe_hosts_set()
+    {
+        $this->runWithEnv(['ALLOWED_IFRAME_HOSTS' => 'http://example.com'], function () {
+            $resp = $this->get('/');
+            foreach ($resp->headers->getCookies() as $cookie) {
+                $this->assertEquals('none', $cookie->getSameSite());
+            }
+        });
+    }
+
+    public function test_secure_cookies_controlled_by_app_url()
+    {
+        $this->runWithEnv(['APP_URL' => 'http://example.com'], function () {
+            $resp = $this->get('/');
+            foreach ($resp->headers->getCookies() as $cookie) {
+                $this->assertFalse($cookie->isSecure());
+            }
+        });
+
+        $this->runWithEnv(['APP_URL' => 'https://example.com'], function () {
+            $resp = $this->get('/');
+            foreach ($resp->headers->getCookies() as $cookie) {
+                $this->assertTrue($cookie->isSecure());
+            }
+        });
+    }
+
+    public function test_iframe_csp_self_only_by_default()
+    {
+        $resp = $this->get('/');
+        $frameHeader = $this->getCspHeader($resp, 'frame-ancestors');
+
+        $this->assertEquals('frame-ancestors \'self\'', $frameHeader);
+    }
+
+    public function test_iframe_csp_includes_extra_hosts_if_configured()
+    {
+        $this->runWithEnv(['ALLOWED_IFRAME_HOSTS' => 'https://a.example.com https://b.example.com'], function () {
+            $resp = $this->get('/');
+            $frameHeader = $this->getCspHeader($resp, 'frame-ancestors');
+
+            $this->assertNotEmpty($frameHeader);
+            $this->assertEquals('frame-ancestors \'self\' https://a.example.com https://b.example.com', $frameHeader);
+        });
+    }
+
+    public function test_script_csp_set_on_responses()
+    {
+        $resp = $this->get('/');
+        $scriptHeader = $this->getCspHeader($resp, 'script-src');
+        $this->assertStringContainsString('\'strict-dynamic\'', $scriptHeader);
+        $this->assertStringContainsString('\'nonce-', $scriptHeader);
+    }
+
+    public function test_script_csp_nonce_matches_nonce_used_in_custom_head()
+    {
+        $this->setSettings(['app-custom-head' => '<script>console.log("cat");</script>']);
+        $resp = $this->get('/login');
+        $scriptHeader = $this->getCspHeader($resp, 'script-src');
+
+        $nonce = app()->make(CspService::class)->getNonce();
+        $this->assertStringContainsString('nonce-' . $nonce, $scriptHeader);
+        $resp->assertSee('<script nonce="' . $nonce . '">console.log("cat");</script>', false);
+    }
+
+    public function test_script_csp_nonce_changes_per_request()
+    {
+        $resp = $this->get('/');
+        $firstHeader = $this->getCspHeader($resp, 'script-src');
+
+        $this->refreshApplication();
+
+        $resp = $this->get('/');
+        $secondHeader = $this->getCspHeader($resp, 'script-src');
+
+        $this->assertNotEquals($firstHeader, $secondHeader);
+    }
+
+    public function test_content_filtering_config_controls_csp_script_headers()
+    {
+        config()->set('app.content_filtering', '');
+        $resp = $this->get('/');
+        $scriptHeader = $this->getCspHeader($resp, 'script-src');
+        $this->assertEmpty($scriptHeader);
+
+        config()->set('app.content_filtering', 'j');
+        $resp = $this->get('/');
+        $scriptHeader = $this->getCspHeader($resp, 'script-src');
+        $this->assertNotEmpty($scriptHeader);
+    }
+
+    public function test_object_src_csp_header_set()
+    {
+        $resp = $this->get('/');
+        $scriptHeader = $this->getCspHeader($resp, 'object-src');
+        $this->assertEquals('object-src \'self\'', $scriptHeader);
+    }
+
+    public function test_base_uri_csp_header_set()
+    {
+        $resp = $this->get('/');
+        $scriptHeader = $this->getCspHeader($resp, 'base-uri');
+        $this->assertEquals('base-uri \'self\'', $scriptHeader);
+    }
+
+    public function test_frame_src_csp_header_set()
+    {
+        $resp = $this->get('/');
+        $scriptHeader = $this->getCspHeader($resp, 'frame-src');
+        $this->assertEquals('frame-src \'self\' https://*.draw.io https://*.youtube.com https://*.youtube-nocookie.com https://*.vimeo.com', $scriptHeader);
+    }
+
+    public function test_frame_src_csp_header_has_drawio_host_added()
+    {
+        config()->set([
+            'app.iframe_sources' => 'https://example.com',
+            'services.drawio'    => 'https://diagrams.example.com/testing?cat=dog',
+        ]);
+
+        $resp = $this->get('/');
+        $scriptHeader = $this->getCspHeader($resp, 'frame-src');
+        $this->assertEquals('frame-src \'self\' https://example.com https://diagrams.example.com', $scriptHeader);
+    }
+
+    public function test_frame_src_csp_header_drawio_host_includes_port_if_existing()
+    {
+        config()->set([
+            'app.iframe_sources' => 'https://example.com',
+            'services.drawio'    => 'https://diagrams.example.com:8080/testing?cat=dog',
+        ]);
+
+        $resp = $this->get('/');
+        $scriptHeader = $this->getCspHeader($resp, 'frame-src');
+        $this->assertEquals('frame-src \'self\' https://example.com https://diagrams.example.com:8080', $scriptHeader);
+    }
+
+    public function test_style_src_csp_header_set_to_permissive_defaults_when_not_configured()
+    {
+        config()->set('app.style_sources', null);
+        $resp = $this->get('/');
+        $header = $this->getCspHeader($resp, 'style-src');
+
+        $this->assertEquals("style-src 'self' 'unsafe-inline' http: https:", $header);
+    }
+
+    public function test_style_src_csp_header_can_be_overridden_by_config()
+    {
+        config()->set('app.style_sources', 'https://fonts.example.com');
+
+        $resp = $this->get('/');
+        $header = $this->getCspHeader($resp, 'style-src');
+
+        $this->assertEquals("style-src 'self' https://fonts.example.com", $header);
+    }
+
+    public function test_style_src_csp_header_unsafe_inline_value_will_be_auto_quoted()
+    {
+        config()->set('app.style_sources', 'unsafe-inline https://css.example.com');
+
+        $resp = $this->get('/');
+        $header = $this->getCspHeader($resp, 'style-src');
+
+        $this->assertEquals("style-src 'self' 'unsafe-inline' https://css.example.com", $header);
+    }
+
+    public function test_style_src_can_be_blank_to_set_no_additions()
+    {
+        config()->set('app.style_sources', '');
+
+        $resp = $this->get('/');
+        $header = $this->getCspHeader($resp, 'style-src');
+
+        $this->assertEquals("style-src 'self'", $header);
+    }
+
+    public function test_img_src_csp_header_set_to_permissive_defaults_when_not_configured()
+    {
+        config()->set('app.image_sources', null);
+        $resp = $this->get('/');
+        $header = $this->getCspHeader($resp, 'img-src');
+
+        $this->assertEquals("img-src 'self' data: blob: http: https:", $header);
+    }
+
+    public function test_img_src_csp_header_can_be_overridden_by_config()
+    {
+        config()->set('app.image_sources', 'https://images.example.com');
+
+        $resp = $this->get('/');
+        $header = $this->getCspHeader($resp, 'img-src');
+
+        $this->assertEquals("img-src 'self' blob: data: https://images.example.com", $header);
+    }
+
+    public function test_img_src_can_be_blank_to_set_no_additions()
+    {
+        config()->set('app.image_sources', '');
+        $resp = $this->get('/');
+        $header = $this->getCspHeader($resp, 'img-src');
+
+        $this->assertEquals("img-src 'self' blob: data:", $header);
+    }
+
+    public function test_csp_headers_are_set_on_api_responses()
+    {
+        $resp = $this->asEditor()->get('/api/books');
+        $header = $this->getCspHeader($resp, 'script-src');
+
+        $this->assertStringContainsString('nonce', $header);
+    }
+
+    public function test_csp_headers_for_api_dont_alter_session_config()
+    {
+        $this->runWithEnv(['ALLOWED_IFRAME_HOSTS' => 'http://example.com'], function () {
+            $resp = $this->asEditor()->withCookie('bookstack_session', 'a')->get('/api/books');
+            $cookies = $resp->headers->getCookies();
+            $this->assertGreaterThan(0, count($cookies));
+            foreach ($cookies as $cookie) {
+                $this->assertEquals('lax', $cookie->getSameSite());
+            }
+
+            $header = $this->getCspHeader($resp, 'script-src');
+            $this->assertStringContainsString('nonce', $header);
+        });
+    }
+
+    public function test_cache_control_headers_are_set_on_responses()
+    {
+        // Public access
+        $resp = $this->get('/');
+        $resp->assertHeader('Cache-Control', 'no-cache, no-store, private');
+        $resp->assertHeader('Expires', 'Sun, 12 Jul 2015 19:01:00 GMT');
+
+        // Authed access
+        $this->asEditor();
+        $resp = $this->get('/');
+        $resp->assertHeader('Cache-Control', 'no-cache, no-store, private');
+        $resp->assertHeader('Expires', 'Sun, 12 Jul 2015 19:01:00 GMT');
+    }
+
+    /**
+     * Get the value of the first CSP header of the given type.
+     */
+    protected function getCspHeader(TestResponse $resp, string $type): string
+    {
+        $cspHeaders = explode('; ', $resp->headers->get('Content-Security-Policy'));
+
+        foreach ($cspHeaders as $cspHeader) {
+            if (str_starts_with($cspHeader, $type)) {
+                return $cspHeader;
+            }
+        }
+
+        return '';
+    }
+}

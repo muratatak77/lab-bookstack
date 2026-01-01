@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [ development ]
+  pull_request:
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: gd, mbstring, json, curl, xml, mysql, ldap, gmp
+      - name: Start MySQL
+        run: sudo systemctl start mysql
+      - name: Create the test database
+        run: |
+          mysql -uroot -proot -e 'CREATE DATABASE IF NOT EXISTS `bookstack-test`;'
+          mysql -uroot -proot -e "CREATE USER 'bookstack-test'@'localhost' IDENTIFIED BY 'bookstack-test';"
+          mysql -uroot -proot -e "GRANT ALL ON \`bookstack-test\`.* TO 'bookstack-test'@'localhost';"
+      - run: composer install --no-interaction --prefer-dist
+      - run: php artisan migrate --force -n --database=mysql_testing
+      - run: php artisan db:seed --force -n --class=DummyContentSeeder --database=mysql_testing
+      - run: vendor/bin/phpunit
