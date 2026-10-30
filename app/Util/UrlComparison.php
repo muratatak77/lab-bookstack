@@ -19,7 +19,8 @@ class UrlComparison
         $bParts = parse_url($this->b);
 
         return ($aParts['host'] ?? '') === ($bParts['host'] ?? '')
-            && ($aParts['scheme'] ?? '') === ($bParts['scheme'] ?? '');
+            && ($aParts['scheme'] ?? '') === ($bParts['scheme'] ?? '')
+            && ($aParts['port'] ?? '') === ($bParts['port'] ?? '');
     }
 
     /**
