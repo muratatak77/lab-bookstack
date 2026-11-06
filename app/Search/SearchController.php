@@ -36,7 +36,7 @@ class SearchController extends Controller
         $this->setPageTitle(trans('entities.search_for_term', ['term' => $fullSearchString]));
 
         return view('search.all', [
-            'entities'     => $results['results'],
+            'entities'     => $results['results'],  // changed on the base while this PR was open (1793989308)
             'totalResults' => $results['total'],
             'paginator'    => $paginator,
             'searchTerm'   => $fullSearchString,
