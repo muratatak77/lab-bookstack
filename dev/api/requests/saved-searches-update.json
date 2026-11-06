@@ -1,0 +1,4 @@
+{
+	"name": "Deployment docs (open)",
+	"query": "deployment {type:page|chapter} [status=open]"
+}

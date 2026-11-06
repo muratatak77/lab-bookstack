@@ -215,6 +215,7 @@ class UserRepo
         $user->favourites()->delete();
         $user->mfaValues()->delete();
         $user->watches()->delete();
+        $user->savedSearches()->delete();
 
         $tables = ['email_confirmations', 'user_invites', 'views'];
         foreach ($tables as $table) {

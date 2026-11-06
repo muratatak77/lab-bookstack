@@ -1,0 +1,104 @@
+<?php
+
+namespace BookStack\Search;
+
+use BookStack\Users\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+
+class SavedSearchRepo
+{
+    /**
+     * Start a query for the saved searches belonging to the given user.
+     * @return Builder<SavedSearch>
+     */
+    public function queryForUser(User $user): Builder
+    {
+        return SavedSearch::query()->where('user_id', '=', $user->id);
+    }
+
+    /**
+     * Get all saved searches for the given user, ordered by name.
+     * @return Collection<int, SavedSearch>
+     */
+    public function getAllForUser(User $user): Collection
+    {
+        return $this->queryForUser($user)
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Find a saved search, by ID, which belongs to the given user.
+     * Throws a not-found exception if not found or not owned by the user.
+     */
+    public function findForUserOrFail(User $user, int $id): SavedSearch
+    {
+        return $this->queryForUser($user)->findOrFail($id);
+    }
+
+    /**
+     * Create a new saved search for the given user.
+     */
+    public function create(User $user, string $name, string $query): SavedSearch
+    {
+        $search = new SavedSearch();
+        $search->user_id = $user->id;
+        $search->name = trim($name);
+        $search->query = $this->normaliseQuery($query);
+        $search->save();
+
+        return $search;
+    }
+
+    /**
+     * Update the name and/or query of an existing saved search.
+     * @param array{name?: string, query?: string} $input
+     */
+    public function update(SavedSearch $search, array $input): SavedSearch
+    {
+        if (isset($input['name'])) {
+            $search->name = trim($input['name']);
+        }
+
+        if (isset($input['query'])) {
+            $search->query = $this->normaliseQuery($input['query']);
+        }
+
+        $search->save();
+
+        return $search;
+    }
+
+    /**
+     * Delete the given saved search.
+     */
+    public function destroy(SavedSearch $search): void
+    {
+        $search->delete();
+    }
+
+    /**
+     * Get the validation rules for saved search input.
+     * When updating, the ID of the existing search should be provided
+     * so that its own name is ignored for uniqueness checks.
+     */
+    public function validationRules(User $user, ?int $ignoreId = null, bool $required = true): array
+    {
+        $presence = $required ? ['required'] : [];
+
+        return [
+            'name'  => [...$presence, 'string', 'min:1', 'max:180', new SavedSearchNameRule($user, $ignoreId)],
+            'query' => [...$presence, 'string', 'max:2000', new SearchQueryRule()],
+        ];
+    }
+
+    /**
+     * Normalise the given query string to a consistent format, as would be
+     * used by the search system, so that equivalent searches can be matched.
+     */
+    protected function normaliseQuery(string $query): string
+    {
+        return SearchOptions::fromString($query)->toString();
+    }
+}

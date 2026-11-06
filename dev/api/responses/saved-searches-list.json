@@ -1,0 +1,19 @@
+{
+	"data": [
+		{
+			"id": 14,
+			"name": "Open deployment docs",
+			"query": "deployment [status=open] {type:page} {updated_after:2026-01-01}",
+			"created_at": "2026-11-04T10:12:44.000000Z",
+			"updated_at": "2026-11-04T10:12:44.000000Z"
+		},
+		{
+			"id": 9,
+			"name": "My recent drafts",
+			"query": "{created_by:me} {type:page} {sort_by:last_commented}",
+			"created_at": "2026-10-21T15:02:10.000000Z",
+			"updated_at": "2026-10-28T09:47:33.000000Z"
+		}
+	],
+	"total": 2
+}
