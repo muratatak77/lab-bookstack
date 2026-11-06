@@ -16,6 +16,7 @@ use BookStack\Api\ApiToken;
 use BookStack\Entities\Models\Deletion;
 use BookStack\Entities\Models\PageRevision;
 use BookStack\Exports\Import;
+use BookStack\Search\SavedSearch;
 use BookStack\Uploads\Attachment;
 use BookStack\Uploads\Image;
 use BookStack\Users\Models\Role;
@@ -219,6 +220,7 @@ class UserManagementTest extends TestCase
         \DB::table('user_invites')->insert(['user_id' => $user->id, 'token' => 'abc123']);
         View::incrementFor($page);
         $watch = Watch::factory()->create(['user_id' => $user->id]);
+        $savedSearch = SavedSearch::factory()->create(['user_id' => $user->id]);
 
         $userColumnsByTable = [
             'api_tokens' => ['user_id'],
@@ -234,6 +236,7 @@ class UserManagementTest extends TestCase
             'mfa_values' => ['user_id'],
             'page_revisions' => ['created_by'],
             'role_user' => ['user_id'],
+            'saved_searches' => ['user_id'],
             'social_accounts' => ['user_id'],
             'user_invites' => ['user_id'],
             'views' => ['user_id'],
@@ -272,6 +275,7 @@ class UserManagementTest extends TestCase
         $this->assertDatabaseMissing('favourites', ['id' => $favourite->id]);
         $this->assertDatabaseMissing('mfa_values', ['id' => $mfaValue->id]);
         $this->assertDatabaseMissing('social_accounts', ['id' => $socialAccount->id]);
+        $this->assertDatabaseMissing('saved_searches', ['id' => $savedSearch->id]);
         $this->assertDatabaseMissing('user_invites', ['token' => 'abc123']);
         $this->assertDatabaseMissing('watches', ['id' => $watch->id]);
 

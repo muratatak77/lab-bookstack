@@ -12,6 +12,7 @@ use BookStack\Api\ApiToken;
 use BookStack\App\Model;
 use BookStack\App\SluggableInterface;
 use BookStack\Permissions\Permission;
+use BookStack\Search\SavedSearch;
 use BookStack\Translation\LocaleDefinition;
 use BookStack\Translation\LocaleManager;
 use BookStack\Uploads\Image;
@@ -279,6 +280,14 @@ class User extends Model implements AuthenticatableContract, CanResetPasswordCon
     public function watches(): HasMany
     {
         return $this->hasMany(Watch::class);
+    }
+
+    /**
+     * Get the saved searches for this user.
+     */
+    public function savedSearches(): HasMany
+    {
+        return $this->hasMany(SavedSearch::class);
     }
 
     /**

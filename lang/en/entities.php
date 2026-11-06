@@ -106,6 +106,14 @@ return [
     'search_created_after' => 'Created after',
     'search_set_date' => 'Set Date',
     'search_update' => 'Update Search',
+    'search_saved' => 'Saved Searches',
+    'search_saved_none' => 'You have no saved searches. Run a search then save it to quickly return to it later.',
+    'search_saved_save' => 'Save this search',
+    'search_saved_name_placeholder' => 'Name for this search',
+    'search_saved_as' => 'Saved as ":name"',
+    'search_saved_delete_named' => 'Delete saved search ":name"',
+    'search_saved_create_success' => 'Search saved as ":name"',
+    'search_saved_delete_success' => 'Saved search ":name" deleted',
 
     // Shelves
     'shelf' => 'Shelf',

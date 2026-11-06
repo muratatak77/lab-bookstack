@@ -13,6 +13,7 @@ use BookStack\App\SystemApiController;
 use BookStack\Entities\Controllers as EntityControllers;
 use BookStack\Exports\Controllers as ExportControllers;
 use BookStack\Permissions\ContentPermissionApiController;
+use BookStack\Search\SavedSearchApiController;
 use BookStack\Search\SearchApiController;
 use BookStack\Uploads\Controllers\AttachmentApiController;
 use BookStack\Uploads\Controllers\ImageGalleryApiController;
@@ -105,6 +106,12 @@ Route::post('roles', [RoleApiController::class, 'create']);
 Route::get('roles/{id}', [RoleApiController::class, 'read']);
 Route::put('roles/{id}', [RoleApiController::class, 'update']);
 Route::delete('roles/{id}', [RoleApiController::class, 'delete']);
+
+Route::get('saved-searches', [SavedSearchApiController::class, 'list']);
+Route::post('saved-searches', [SavedSearchApiController::class, 'create']);
+Route::get('saved-searches/{id}', [SavedSearchApiController::class, 'read']);
+Route::put('saved-searches/{id}', [SavedSearchApiController::class, 'update']);
+Route::delete('saved-searches/{id}', [SavedSearchApiController::class, 'delete']);
 
 Route::get('search', [SearchApiController::class, 'all']);
 Route::get('search/book/{id}', [SearchApiController::class, 'book']);

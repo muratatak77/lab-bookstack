@@ -1,0 +1,4 @@
+{
+	"name": "Open deployment docs",
+	"query": "deployment {type:page} [status=open] {updated_after:2026-01-01}"
+}

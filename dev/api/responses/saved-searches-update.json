@@ -1,0 +1,8 @@
+{
+	"id": 14,
+	"name": "Deployment docs (open)",
+	"query": "deployment [status=open] {type:page|chapter}",
+	"created_at": "2026-11-04T10:12:44.000000Z",
+	"updated_at": "2026-11-05T08:31:02.000000Z",
+	"url": "https:\/\/example.com\/search?term=deployment+%5Bstatus%3Dopen%5D+%7Btype%3Apage%7Cchapter%7D"
+}

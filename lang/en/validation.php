@@ -94,6 +94,7 @@ return [
     'required_without_all' => 'The :attribute field is required when none of :values are present.',
     'same'                 => 'The :attribute and :other must match.',
     'safe_url'             => 'The provided link may not be safe.',
+    'saved_search_query_empty' => 'The :attribute must contain at least one search term or filter.',
     'size'                 => [
         'numeric' => 'The :attribute must be :size.',
         'file'    => 'The :attribute must be :size kilobytes.',

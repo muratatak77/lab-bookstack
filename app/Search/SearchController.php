@@ -14,6 +14,7 @@ class SearchController extends Controller
     public function __construct(
         protected SearchRunner $searchRunner,
         protected PageQueries $pageQueries,
+        protected SavedSearchRepo $savedSearchRepo,
     ) {
     }
 
@@ -33,14 +34,25 @@ class SearchController extends Controller
         $paginator->setPath(url('/search'));
         $paginator->appends($request->except('page'));
 
+        $savedSearches = collect();
+        $currentSavedSearch = null;
+        if (!user()->isGuest()) {
+            $savedSearches = $this->savedSearchRepo->getAllForUser(user());
+            $currentSavedSearch = $fullSearchString === '' ? null : $savedSearches->first(
+                fn (SavedSearch $search) => $search->matchesOptions($searchOpts)
+            );
+        }
+
         $this->setPageTitle(trans('entities.search_for_term', ['term' => $fullSearchString]));
 
         return view('search.all', [
-            'entities'     => $results['results'],  // changed on the base while this PR was open (1793990535)
-            'totalResults' => $results['total'],
-            'paginator'    => $paginator,
-            'searchTerm'   => $fullSearchString,
-            'options'      => $searchOpts,
+            'entities'           => $results['results'],  // changed on the base while this PR was open (1793990535)
+            'totalResults'       => $results['total'],
+            'paginator'          => $paginator,
+            'searchTerm'         => $fullSearchString,
+            'options'            => $searchOpts,
+            'savedSearches'      => $savedSearches,
+            'currentSavedSearch' => $currentSavedSearch,
         ]);
     }
 

@@ -11,6 +11,7 @@ use BookStack\Exports\Controllers as ExportControllers;
 use BookStack\Http\Middleware\PreventRequestForgery;
 use BookStack\Permissions\PermissionsController;
 use BookStack\References\ReferenceController;
+use BookStack\Search\SavedSearchController;
 use BookStack\Search\SearchController;
 use BookStack\Settings as SettingControllers;
 use BookStack\Sorting as SortingControllers;
@@ -197,6 +198,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/search/entity-selector', [SearchController::class, 'searchForSelector']);
     Route::get('/search/entity-selector-templates', [SearchController::class, 'templatesForSelector']);
     Route::get('/search/suggest', [SearchController::class, 'searchSuggestions']);
+    Route::post('/search/saved', [SavedSearchController::class, 'store']);
+    Route::delete('/search/saved/{id}', [SavedSearchController::class, 'destroy']);
 
     // User Search
     Route::get('/search/users/select', [UserControllers\UserSearchController::class, 'forSelect']);

@@ -5,6 +5,10 @@
 
         <div class="grid right-focus reverse-collapse gap-xl">
             <div>
+                @if(!user()->isGuest())
+                    @include('search.parts.saved-search-list', ['savedSearches' => $savedSearches, 'currentSavedSearch' => $currentSavedSearch])
+                @endif
+
                 <div>
                     <h5>{{ trans('entities.search_advanced') }}</h5>
 
@@ -83,6 +87,11 @@
                     </form>
 
                     <h6 class="text-muted">{{ trans_choice('entities.search_total_results_found', $totalResults, ['count' => $totalResults]) }}</h6>
+
+                    @if(!user()->isGuest() && $searchTerm !== '')
+                        @include('search.parts.saved-search-form', ['searchTerm' => $searchTerm, 'currentSavedSearch' => $currentSavedSearch])
+                    @endif
+
                     <div class="book-contents">
                         @include('entities.list', ['entities' => $entities, 'showPath' => true, 'showTags' => true])
                     </div>

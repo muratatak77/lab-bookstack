@@ -862,3 +862,25 @@ ul.pagination {
     margin: 0;
   }
 }
+
+.saved-search-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  a {
+    display: flex;
+    align-items: center;
+    gap: vars.$xs;
+    min-width: 0;
+  }
+  svg {
+    flex-shrink: 0;
+    width: 1em;
+    margin: 0;
+  }
+}
+
+.saved-search-form input[type="text"] {
+  min-width: 160px;
+  max-width: 320px;
+}
