@@ -130,8 +130,7 @@ class ImageService
         $disk = $this->storage->getDisk($image->type);
         $disk->put($image->path, $imageData);
 
-        $image->blurhash = $this->generateBlurhashForType($image->type, $imageData);
-        $image->save();
+        $this->storeBlurhash($image, $this->generateBlurhashForType($image->type, $imageData));
     }
 
     /**
@@ -148,10 +147,21 @@ class ImageService
         }
 
         $blurhash = $imageData ? $this->generateBlurhashForType($image->type, $imageData) : null;
-        $image->blurhash = $blurhash;
-        $image->save();
+        $this->storeBlurhash($image, $blurhash);
 
         return $blurhash !== null;
+    }
+
+    /**
+     * Persist the given blurhash for the image, updating only the blurhash column.
+     * The image model may hold non-column attributes (such as "thumbs", set by the ImageResizer)
+     * so a full model save is avoided to prevent those from being included in the update query.
+     */
+    protected function storeBlurhash(Image $image, ?string $blurhash): void
+    {
+        $image->newQuery()->whereKey($image->getKey())->update(['blurhash' => $blurhash]);
+        $image->setAttribute('blurhash', $blurhash);
+        $image->syncOriginalAttribute('blurhash');
     }
 
     /**
