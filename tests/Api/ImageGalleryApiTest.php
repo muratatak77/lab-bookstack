@@ -18,6 +18,7 @@ class ImageGalleryApiTest extends TestCase
         $imagePage = $this->entities->page();
         $data = $this->files->uploadGalleryImageToPage($this, $imagePage);
         $image = Image::findOrFail($data['response']->id);
+        $this->assertNotNull($image->blurhash);
 
         $resp = $this->getJson($this->baseEndpoint . '?count=1&sort=+id');
         $resp->assertJson(['data' => [
@@ -26,6 +27,7 @@ class ImageGalleryApiTest extends TestCase
                 'name' => $image->name,
                 'url' => $image->url,
                 'path' => $image->path,
+                'blurhash' => $image->blurhash,
                 'type' => 'gallery',
                 'uploaded_to' => $imagePage->id,
                 'created_by' => $this->users->admin()->id,
@@ -95,6 +97,7 @@ class ImageGalleryApiTest extends TestCase
         $resp->assertStatus(200);
 
         $image = Image::query()->where('uploaded_to', '=', $imagePage->id)->first();
+        $this->assertNotNull($image->blurhash);
         $expectedUser = [
             'id' => $this->users->admin()->id,
             'name' => $this->users->admin()->name,
@@ -105,6 +108,7 @@ class ImageGalleryApiTest extends TestCase
             'name' => 'My awesome image!',
             'url' => $image->url,
             'path' => $image->path,
+            'blurhash' => $image->blurhash,
             'type' => 'gallery',
             'uploaded_to' => $imagePage->id,
             'created_by' => $expectedUser,
@@ -252,6 +256,7 @@ class ImageGalleryApiTest extends TestCase
             'name' => $image->name,
             'url' => $image->url,
             'path' => $image->path,
+            'blurhash' => $image->blurhash,
             'type' => 'gallery',
             'uploaded_to' => $imagePage->id,
             'created_by' => $expectedUser,
@@ -410,6 +415,7 @@ class ImageGalleryApiTest extends TestCase
         $imagePage = $this->entities->page();
         $data = $this->files->uploadGalleryImageToPage($this, $imagePage);
         $image = Image::findOrFail($data['response']->id);
+        $originalBlurhash = $image->blurhash;
 
         $this->assertFileEquals($this->files->testFilePath('test-image.png'), public_path($data['path']));
 
@@ -419,6 +425,11 @@ class ImageGalleryApiTest extends TestCase
 
         $resp->assertStatus(200);
         $this->assertFileEquals($this->files->testFilePath('compressed.png'), public_path($data['path']));
+
+        $image->refresh();
+        $this->assertNotNull($image->blurhash);
+        $this->assertNotEquals($originalBlurhash, $image->blurhash);
+        $resp->assertJson(['blurhash' => $image->blurhash]);
     }
 
     public function test_update_endpoint_requires_image_update_permission()

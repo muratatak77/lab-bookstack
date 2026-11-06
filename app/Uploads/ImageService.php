@@ -17,6 +17,12 @@ class ImageService
 {
     protected static array $supportedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'];
 
+    /**
+     * Image types which will have a blurhash placeholder generated & stored.
+     * These are the types which are listed and shown via the gallery & API.
+     */
+    protected static array $blurhashTypes = Image::PAGE_IMAGE_TYPES;
+
     public function __construct(
         protected ImageStorage $storage,
         protected ImageResizer $resizer,
@@ -99,6 +105,7 @@ class ImageService
             'url'         => $this->storage->getPublicUrl($fullPath),
             'type'        => $type,
             'uploaded_to' => $uploadedTo,
+            'blurhash'    => $this->generateBlurhashForType($type, $imageData),
         ];
 
         if (user()->id !== 0) {
@@ -114,13 +121,77 @@ class ImageService
     }
 
     /**
-     * Replace an existing image file in the system using the given file.
+     * Replace the file of an existing image in the system using the given file.
+     * Updates the stored blurhash for the image to match the new file.
      */
-    public function replaceExistingFromUpload(string $path, string $type, UploadedFile $file): void
+    public function replaceExistingFromUpload(Image $image, UploadedFile $file): void
     {
         $imageData = file_get_contents($file->getRealPath());
-        $disk = $this->storage->getDisk($type);
-        $disk->put($path, $imageData);
+        $disk = $this->storage->getDisk($image->type);
+        $disk->put($image->path, $imageData);
+
+        $this->storeBlurhash($image, $this->generateBlurhashForType($image->type, $imageData));
+    }
+
+    /**
+     * Regenerate and store the blurhash for the given existing image, using its stored file.
+     * Returns a boolean to indicate if a blurhash could be generated for the image.
+     * Images of types which don't use blurhashes will always have their blurhash cleared.
+     * If the image file can't be read from storage, the existing blurhash is left untouched
+     * so that a temporary storage failure does not erase a valid hash.
+     */
+    public function regenerateBlurhash(Image $image): bool
+    {
+        try {
+            $imageData = $this->storage->getDisk($image->type)->get($image->path);
+        } catch (Exception $e) {
+            Log::error("Failed to read image {$image->id} for blurhash generation with error: " . $e->getMessage());
+            return false;
+        }
+
+        if (!$imageData) {
+            Log::error("Failed to read image {$image->id} at path {$image->path} for blurhash generation");
+            return false;
+        }
+
+        $blurhash = $this->generateBlurhashForType($image->type, $imageData);
+        $this->storeBlurhash($image, $blurhash);
+
+        return $blurhash !== null;
+    }
+
+    /**
+     * Persist the given blurhash for the image, updating only the blurhash column.
+     * The image model may hold non-column attributes (such as "thumbs", set by the ImageResizer)
+     * so a full model save is avoided to prevent those from being included in the update query.
+     */
+    protected function storeBlurhash(Image $image, ?string $blurhash): void
+    {
+        $image->newQuery()->whereKey($image->getKey())->update(['blurhash' => $blurhash]);
+        $image->setAttribute('blurhash', $blurhash);
+        $image->syncOriginalAttribute('blurhash');
+    }
+
+    /**
+     * Generate a blurhash for the given image data, if applicable to the given image type.
+     */
+    protected function generateBlurhashForType(string $type, string $imageData): ?string
+    {
+        if (!in_array($type, static::$blurhashTypes)) {
+            return null;
+        }
+
+        return $this->resizer->blurhashFromImageData($imageData);
+    }
+
+    /**
+     * Get the image types for which blurhash placeholders are generated.
+     *
+     * @return string[]
+     */
+    public static function getBlurhashTypes(): array
+    {
+        return static::$blurhashTypes;
     }
 
     /**
@@ -177,7 +248,7 @@ class ImageService
      */
     public function deleteUnusedImages(bool $checkRevisions = true, bool $dryRun = true): array
     {
-        $types = ['gallery', 'drawio'];
+        $types = Image::PAGE_IMAGE_TYPES;
         $deletedPaths = [];
 
         Image::query()->whereIn('type', $types)

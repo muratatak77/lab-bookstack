@@ -192,6 +192,13 @@ Copyright: Copyright (c) 2010 Matthieu Bontemps
 Source: https://github.com/KnpLabs/snappy.git
 Link: http://github.com/KnpLabs/snappy
 -----------
+kornrunner/blurhash
+License: MIT
+License File: vendor/kornrunner/blurhash/LICENSE
+Copyright: Copyright (c) 2019 Boris Momčilović
+Source: https://github.com/kornrunner/php-blurhash.git
+Link: https://github.com/kornrunner/php-blurhash
+-----------
 laravel/framework
 License: MIT
 License File: vendor/laravel/framework/LICENSE.md

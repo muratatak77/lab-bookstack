@@ -135,7 +135,7 @@ class ImageController extends Controller
     }
 
     /**
-     * Rebuild the thumbnails for the given image.
+     * Rebuild the thumbnails, and blurhash placeholder, for the given image.
      */
     public function rebuildThumbnails(string $id)  // changed on the base while this PR was open (1793990521)
     {
@@ -148,6 +148,7 @@ class ImageController extends Controller
         });
 
         $this->imageResizer->loadGalleryThumbnailsForImage($image, true);
+        $this->imageService->regenerateBlurhash($image);
 
         return response(trans('components.image_rebuild_thumbs_success'));
     }
