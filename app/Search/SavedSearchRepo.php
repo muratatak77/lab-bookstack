@@ -94,7 +94,7 @@ class SavedSearchRepo
      */
     public function validationRules(User $user, ?int $ignoreId = null, bool $required = true): array
     {
-        $presence = $required ? ['required'] : ['sometimes'];
+        $presence = $required ? ['required'] : ['sometimes', 'required'];
 
         return [
             'name'  => [...$presence, 'string', 'min:1', 'max:180', (new Unique('saved_searches', 'name'))->where('user_id', $user->id)->ignore($ignoreId)],
