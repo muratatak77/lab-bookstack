@@ -79,3 +79,5 @@ class IpFormatter
         return new self($ip, config('app.ip_address_precision'));
     }
 }
+
+// Lab note.
