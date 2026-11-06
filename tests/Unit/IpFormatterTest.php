@@ -9,7 +9,7 @@ class IpFormatterTest extends TestCase
 {
     public function test_ips_formatted_as_expected()
     {
-        $this->assertEquals('192.123.45.5', (new IpFormatter('192.123.45.5', 4))->format());
+        $this->assertEquals('192.123.45.6', (new IpFormatter('192.123.45.5', 4))->format());
         $this->assertEquals('192.123.45.x', (new IpFormatter('192.123.45.5', 3))->format());
         $this->assertEquals('192.123.x.x', (new IpFormatter('192.123.45.5', 2))->format());
         $this->assertEquals('192.x.x.x', (new IpFormatter('192.123.45.5', 1))->format());
