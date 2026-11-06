@@ -17,6 +17,12 @@ class ImageService
 {
     protected static array $supportedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'];
 
+    /**
+     * Image types which will have a blurhash placeholder generated & stored.
+     * These are the types which are listed and shown via the gallery & API.
+     */
+    protected static array $blurhashTypes = ['gallery', 'drawio'];
+
     public function __construct(
         protected ImageStorage $storage,
         protected ImageResizer $resizer,
@@ -99,6 +105,7 @@ class ImageService
             'url'         => $this->storage->getPublicUrl($fullPath),
             'type'        => $type,
             'uploaded_to' => $uploadedTo,
+            'blurhash'    => $this->generateBlurhashForType($type, $imageData),
         ];
 
         if (user()->id !== 0) {
@@ -114,13 +121,59 @@ class ImageService
     }
 
     /**
-     * Replace an existing image file in the system using the given file.
+     * Replace the file of an existing image in the system using the given file.
+     * Updates the stored blurhash for the image to match the new file.
      */
-    public function replaceExistingFromUpload(string $path, string $type, UploadedFile $file): void
+    public function replaceExistingFromUpload(Image $image, UploadedFile $file): void
     {
         $imageData = file_get_contents($file->getRealPath());
-        $disk = $this->storage->getDisk($type);
-        $disk->put($path, $imageData);
+        $disk = $this->storage->getDisk($image->type);
+        $disk->put($image->path, $imageData);
+
+        $image->blurhash = $this->generateBlurhashForType($image->type, $imageData);
+        $image->save();
+    }
+
+    /**
+     * Regenerate and store the blurhash for the given existing image, using its stored file.
+     * Returns a boolean to indicate if a blurhash could be generated for the image.
+     * Images of types which don't use blurhashes will always have their blurhash cleared.
+     */
+    public function regenerateBlurhash(Image $image): bool
+    {
+        try {
+            $imageData = $this->storage->getDisk($image->type)->get($image->path);
+        } catch (Exception $e) {
+            $imageData = null;
+        }
+
+        $blurhash = $imageData ? $this->generateBlurhashForType($image->type, $imageData) : null;
+        $image->blurhash = $blurhash;
+        $image->save();
+
+        return $blurhash !== null;
+    }
+
+    /**
+     * Generate a blurhash for the given image data, if applicable to the given image type.
+     */
+    protected function generateBlurhashForType(string $type, string $imageData): ?string
+    {
+        if (!in_array($type, static::$blurhashTypes)) {
+            return null;
+        }
+
+        return $this->resizer->blurhashFromImageData($imageData);
+    }
+
+    /**
+     * Get the image types for which blurhash placeholders are generated.
+     *
+     * @return string[]
+     */
+    public static function getBlurhashTypes(): array
+    {
+        return static::$blurhashTypes;
     }
 
     /**

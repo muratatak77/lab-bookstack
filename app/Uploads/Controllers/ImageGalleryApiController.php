@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 class ImageGalleryApiController extends ApiController
 {
     protected array $fieldsToExpose = [
-        'id', 'name', 'url', 'path', 'type', 'uploaded_to', 'created_by', 'updated_by',  'created_at', 'updated_at',
+        'id', 'name', 'url', 'path', 'blurhash', 'type', 'uploaded_to', 'created_by', 'updated_by',  'created_at', 'updated_at',
     ];
 
     public function __construct(
@@ -92,6 +92,8 @@ class ImageGalleryApiController extends ApiController
      * The "thumbs" response property contains links to scaled variants that BookStack may use in its UI.
      * The "content" response property provides HTML and Markdown content, in the format that BookStack
      * would typically use by default to add the image in page content, as a convenience.
+     * The "blurhash" response property provides a compact representation of a blurred placeholder for the image,
+     * in the BlurHash format (https://blurha.sh), which may be null if a placeholder could not be generated.
      * Actual image file data is not provided but can be fetched via the "url" response property or by
      * using the "read-data" endpoint.
      */

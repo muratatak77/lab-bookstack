@@ -188,7 +188,7 @@ class ImageRepo
         $image->touch();
         $image->save();
 
-        $this->imageService->replaceExistingFromUpload($image->path, $image->type, $file);
+        $this->imageService->replaceExistingFromUpload($image, $file);
         $this->imageResizer->loadGalleryThumbnailsForImage($image, true);
     }
 

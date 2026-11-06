@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string   $name
  * @property string   $url
  * @property string   $path
+ * @property ?string  $blurhash
  * @property string   $type
  * @property int|null $uploaded_to
  * @property int      $created_by

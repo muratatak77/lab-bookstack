@@ -4,21 +4,29 @@ namespace BookStack\Uploads;
 
 use BookStack\Exceptions\ImageUploadException;
 use Exception;
-use GuzzleHttp\Psr7\Utils;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Intervention\Image\Decoders\BinaryImageDecoder;
-use Intervention\Image\Drivers\Gd\Decoders\NativeObjectDecoder;
+use Intervention\Image\Colors\Rgb\Channels\Blue;
+use Intervention\Image\Colors\Rgb\Channels\Green;
+use Intervention\Image\Colors\Rgb\Channels\Red;
+use Intervention\Image\Colors\Rgb\Colorspace as RgbColorspace;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Encoders\AutoEncoder;
 use Intervention\Image\Encoders\PngEncoder;
 use Intervention\Image\Interfaces\ImageInterface as InterventionImage;
 use Intervention\Image\ImageManager;
-use Intervention\Image\Origin;
+use kornrunner\Blurhash\Blurhash;
 
 class ImageResizer
 {
     protected const THUMBNAIL_CACHE_TIME = 604_800; // 1 week
+
+    /**
+     * The max width/height, in pixels, of the image sampled when generating a blurhash.
+     * The hash only holds a few components, so a small sample keeps generation fast
+     * without any noticeable change in the output.
+     */
+    protected const BLURHASH_SAMPLE_SIZE = 32;
 
     public function __construct(
         protected ImageStorage $storage,
@@ -123,13 +131,11 @@ class ImageResizer
         ?string $format = null,
     ): string {
         try {
-            $thumb = $this->interventionFromImageData($imageData, $format);
+            $thumb = $this->interventionFromImageData($imageData);
         } catch (Exception $e) {
             Log::error('Failed to resize image with error:' . $e->getMessage());
             throw new ImageUploadException(trans('errors.cannot_create_thumbs'));
         }
-
-        $this->orientImageToOriginalExif($thumb, $imageData);
 
         if ($keepRatio) {
             $thumb->scaleDown($width, $height);
@@ -155,10 +161,13 @@ class ImageResizer
 
     /**
      * Create an intervention image instance from the given image data.
-     * Performs some manual library usage to ensure the image is specifically loaded
-     * from given binary data instead of data being misinterpreted.
+     * The image is explicitly decoded from binary data so that the data cannot be
+     * misinterpreted as another source type (like a file path).
+     * Orientation from EXIF data is applied, where possible, upon decoding.
+     * GIF images are decoded natively, as a single frame, since we don't need the
+     * added animation support.
      */
-    protected function interventionFromImageData(string $imageData, ?string $fileType): InterventionImage
+    protected function interventionFromImageData(string $imageData): InterventionImage
     {
         if (!extension_loaded('gd')) {
             throw new ImageUploadException('The PHP "gd" extension is required to resize images, but is missing.');
@@ -166,65 +175,64 @@ class ImageResizer
 
         $manager = new ImageManager(
             new Driver(),
-            autoOrientation: false,
+            autoOrientation: true,
+            decodeAnimation: false,
         );
 
-        // Ensure GIF images are decoded natively instead of deferring to intervention GIF
-        // handling since we don't need the added animation support.
-        $isGif = $fileType === 'gif';
-        $decoder = $isGif ? NativeObjectDecoder::class : BinaryImageDecoder::class;
-        $input = $isGif ? @imagecreatefromstring($imageData) : $imageData;
-
-        $image = $manager->read($input, $decoder);
-
-        if ($isGif) {
-            $image->setOrigin(new Origin('image/gif'));
-        }
-
-        return $image;
+        return $manager->decodeBinary($imageData);
     }
 
     /**
-     * Orientate the given intervention image based upon the given original image data.
-     * Intervention does have an `orientate` method but the exif data it needs is lost before it
-     * can be used (At least when created using binary string data) so we need to do some
-     * implementation on our side to use the original image data.
-     * Bulk of logic taken from: https://github.com/Intervention/image/blob/b734a4988b2148e7d10364b0609978a88d277536/src/Intervention/Image/Commands/OrientateCommand.php
-     * Copyright (c) Oliver Vogel, MIT License.
+     * Generate a blurhash string for the given image data, which can be used to
+     * represent a blurred placeholder of the image while the actual image loads.
+     * Returns null if the image data could not be processed.
      */
-    protected function orientImageToOriginalExif(InterventionImage $image, string $originalData): void
+    public function blurhashFromImageData(string $imageData): ?string
     {
-        if (!extension_loaded('exif')) {
-            return;
+        try {
+            $image = $this->interventionFromImageData($imageData);
+            $image->scaleDown(static::BLURHASH_SAMPLE_SIZE, static::BLURHASH_SAMPLE_SIZE);
+            $image->fillTransparentAreas('ffffff');
+            $pixels = $this->getRgbPixelsForImage($image);
+        } catch (Exception $e) {
+            Log::error('Failed to read image for blurhash generation with error:' . $e->getMessage());
+            return null;
         }
 
-        $stream = Utils::streamFor($originalData)->detach();
-        $exif = @exif_read_data($stream);
-        $orientation = $exif ? ($exif['Orientation'] ?? null) : null;
+        // Use more components along the longest side to better match the image shape
+        $isLandscape = $image->width() >= $image->height();
+        $componentsX = $isLandscape ? 4 : 3;
+        $componentsY = $isLandscape ? 3 : 4;
 
-        switch ($orientation) {
-            case 2:
-                $image->flip();
-                break;
-            case 3:
-                $image->rotate(180);
-                break;
-            case 4:
-                $image->rotate(180)->flip();
-                break;
-            case 5:
-                $image->rotate(270)->flip();
-                break;
-            case 6:
-                $image->rotate(270);
-                break;
-            case 7:
-                $image->rotate(90)->flip();
-                break;
-            case 8:
-                $image->rotate(90);
-                break;
+        return Blurhash::encode($pixels, $componentsX, $componentsY);
+    }
+
+    /**
+     * Get the RGB values for each pixel of the given image, as an array of rows,
+     * where each row is an array of [red, green, blue] values.
+     *
+     * @return array<int, array<int, int[]>>
+     */
+    protected function getRgbPixelsForImage(InterventionImage $image): array
+    {
+        $width = $image->width();
+        $height = $image->height();
+        $pixels = [];
+
+        for ($y = 0; $y < $height; $y++) {
+            $row = [];
+            for ($x = 0; $x < $width; $x++) {
+                $color = $image->colorAt($x, $y)->toColorspace(RgbColorspace::class);
+                $row[] = [
+                    $color->channel(Red::class)->value(),
+                    $color->channel(Green::class)->value(),
+                    $color->channel(Blue::class)->value(),
+                ];
+            }
+            $pixels[] = $row;
         }
+
+        return $pixels;
     }
 
     /**
