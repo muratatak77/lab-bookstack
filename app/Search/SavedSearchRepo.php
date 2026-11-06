@@ -5,6 +5,9 @@ namespace BookStack\Search;
 use BookStack\Users\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Validation\Rules\Unique;
+use Illuminate\Validation\ValidationException;
 
 class SavedSearchRepo
 {
@@ -46,7 +49,7 @@ class SavedSearchRepo
         $search->user_id = $user->id;
         $search->name = trim($name);
         $search->query = $this->normaliseQuery($query);
-        $search->save();
+        $this->saveHandlingDuplicateName($search);
 
         return $search;
     }
@@ -65,7 +68,7 @@ class SavedSearchRepo
             $search->query = $this->normaliseQuery($input['query']);
         }
 
-        $search->save();
+        $this->saveHandlingDuplicateName($search);
 
         return $search;
     }
@@ -88,9 +91,26 @@ class SavedSearchRepo
         $presence = $required ? ['required'] : [];
 
         return [
-            'name'  => [...$presence, 'string', 'min:1', 'max:180', new SavedSearchNameRule($user, $ignoreId)],
+            'name'  => [...$presence, 'string', 'min:1', 'max:180', (new Unique('saved_searches', 'name'))->where('user_id', $user->id)->ignore($ignoreId)],
             'query' => [...$presence, 'string', 'max:2000', new SearchQueryRule()],
         ];
+    }
+
+    /**
+     * Save the given search, converting a unique name constraint failure into a validation error.
+     * Validation should prevent duplicate names, but concurrent saves (like a double-submitted form)
+     * can both pass validation before either is written.
+     * @throws ValidationException
+     */
+    protected function saveHandlingDuplicateName(SavedSearch $search): void
+    {
+        try {
+            $search->save();
+        } catch (UniqueConstraintViolationException $exception) {
+            throw ValidationException::withMessages([
+                'name' => [trans('validation.unique', ['attribute' => 'name'])],
+            ]);
+        }
     }
 
     /**

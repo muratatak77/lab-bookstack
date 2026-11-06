@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('saved_searches', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedInteger('user_id')->index();
+            $table->unsignedInteger('user_id');
             $table->string('name', 180);
             $table->text('query');
             $table->timestamps();

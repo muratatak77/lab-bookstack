@@ -16,8 +16,8 @@ use Illuminate\Http\Response;
  *
  * The 'query' property takes the same format as the main BookStack search bar, and as used on
  * the search API endpoint. Queries are normalised when saved, so the stored value may differ in
- * format from that provided. The 'url' property provides a link to run the search within the
- * BookStack interface.
+ * format from that provided. Single-item responses (create, read and update) also include a 'url'
+ * property which provides a link to run the search within the BookStack interface.
  */
 class SavedSearchApiController extends ApiController
 {
@@ -26,13 +26,13 @@ class SavedSearchApiController extends ApiController
     ) {
     }
 
-    protected function rules(): array
+    protected function rules(?int $searchId = null): array
     {
         $user = user();
 
         return [
             'create' => $this->savedSearchRepo->validationRules($user),
-            'update' => $this->savedSearchRepo->validationRules($user, $this->currentRouteId(), false),
+            'update' => $this->savedSearchRepo->validationRules($user, $searchId, false),
         ];
     }
 
@@ -76,7 +76,7 @@ class SavedSearchApiController extends ApiController
     public function update(Request $request, string $id): JsonResponse
     {
         $search = $this->savedSearchRepo->findForUserOrFail(user(), intval($id));
-        $input = $this->validate($request, $this->rules()['update']);
+        $input = $this->validate($request, $this->rules($search->id)['update']);
 
         $search = $this->savedSearchRepo->update($search, $input);
 
@@ -100,12 +100,5 @@ class SavedSearchApiController extends ApiController
         $search->setAttribute('url', $search->getUrl());
 
         return $search;
-    }
-
-    protected function currentRouteId(): ?int
-    {
-        $id = request()->route('id');
-
-        return is_numeric($id) ? intval($id) : null;
     }
 }

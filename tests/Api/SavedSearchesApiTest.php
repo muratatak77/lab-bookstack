@@ -3,6 +3,8 @@
 namespace Tests\Api;
 
 use BookStack\Search\SavedSearch;
+use BookStack\Search\SavedSearchRepo;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class SavedSearchesApiTest extends TestCase
@@ -95,6 +97,16 @@ class SavedSearchesApiTest extends TestCase
         $resp = $this->postJson($this->baseEndpoint, ['name' => str_repeat('a', 181), 'query' => 'cats']);
         $resp->assertStatus(422);
         $resp->assertJsonValidationErrors(['name'], 'error.validation');
+    }
+
+    public function test_duplicate_name_constraint_failure_returns_validation_error()
+    {
+        $editor = $this->users->editor();
+        SavedSearch::factory()->create(['user_id' => $editor->id, 'name' => 'Existing']);
+
+        // Simulates a concurrent save which passed validation before the existing search was written.
+        $this->expectException(ValidationException::class);
+        app(SavedSearchRepo::class)->create($editor, 'Existing', 'cats');
     }
 
     public function test_create_allows_name_used_by_another_user()
