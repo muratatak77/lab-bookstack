@@ -66,8 +66,9 @@ class RegenerateImageBlurhashesCommand extends Command
         $this->comment("Blurhashes generated for {$generated} image(s)");
         if ($failed > 0) {
             $this->warn("{$failed} image(s) could not be processed");
+            return self::FAILURE;
         }
 
-        return 0;
+        return self::SUCCESS;
     }
 }

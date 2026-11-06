@@ -67,7 +67,7 @@ class RegenerateImageBlurhashesCommandTest extends TestCase
         $this->artisan('bookstack:regenerate-image-blurhashes')
             ->expectsOutputToContain("Failed to generate blurhash for image {$image->id} at path {$image->path}")
             ->expectsOutputToContain('1 image(s) could not be processed')
-            ->assertExitCode(0);
+            ->assertExitCode(1);
 
         $this->assertDatabaseHas('images', ['id' => $image->id, 'blurhash' => null]);
     }

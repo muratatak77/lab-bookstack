@@ -21,7 +21,7 @@ class ImageService
      * Image types which will have a blurhash placeholder generated & stored.
      * These are the types which are listed and shown via the gallery & API.
      */
-    protected static array $blurhashTypes = ['gallery', 'drawio'];
+    protected static array $blurhashTypes = Image::PAGE_IMAGE_TYPES;
 
     public function __construct(
         protected ImageStorage $storage,
@@ -137,16 +137,24 @@ class ImageService
      * Regenerate and store the blurhash for the given existing image, using its stored file.
      * Returns a boolean to indicate if a blurhash could be generated for the image.
      * Images of types which don't use blurhashes will always have their blurhash cleared.
+     * If the image file can't be read from storage, the existing blurhash is left untouched
+     * so that a temporary storage failure does not erase a valid hash.
      */
     public function regenerateBlurhash(Image $image): bool
     {
         try {
             $imageData = $this->storage->getDisk($image->type)->get($image->path);
         } catch (Exception $e) {
-            $imageData = null;
+            Log::error("Failed to read image {$image->id} for blurhash generation with error: " . $e->getMessage());
+            return false;
         }
 
-        $blurhash = $imageData ? $this->generateBlurhashForType($image->type, $imageData) : null;
+        if (!$imageData) {
+            Log::error("Failed to read image {$image->id} at path {$image->path} for blurhash generation");
+            return false;
+        }
+
+        $blurhash = $this->generateBlurhashForType($image->type, $imageData);
         $this->storeBlurhash($image, $blurhash);
 
         return $blurhash !== null;
@@ -240,7 +248,7 @@ class ImageService
      */
     public function deleteUnusedImages(bool $checkRevisions = true, bool $dryRun = true): array
     {
-        $types = ['gallery', 'drawio'];
+        $types = Image::PAGE_IMAGE_TYPES;
         $deletedPaths = [];
 
         Image::query()->whereIn('type', $types)

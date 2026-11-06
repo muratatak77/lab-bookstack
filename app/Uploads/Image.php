@@ -28,6 +28,12 @@ class Image extends Model implements OwnableInterface
     use HasFactory;
     use HasCreatorAndUpdater;
 
+    /**
+     * The image types which are used within page content (gallery images & drawings).
+     * These are shown via the gallery & API, and have blurhash placeholders generated.
+     */
+    public const PAGE_IMAGE_TYPES = ['gallery', 'drawio'];
+
     protected $fillable = ['name'];
     protected $hidden = [];
 
@@ -46,7 +52,7 @@ class Image extends Model implements OwnableInterface
     {
         return app()->make(PermissionApplicator::class)
             ->restrictPageRelationQuery($query, 'images', 'uploaded_to')
-            ->whereIn('type', ['gallery', 'drawio']);
+            ->whereIn('type', static::PAGE_IMAGE_TYPES);
     }
 
     /**

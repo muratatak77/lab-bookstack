@@ -104,15 +104,31 @@ class ImageBlurhashTest extends TestCase
         $this->assertDatabaseHas('images', ['id' => $image->id, 'blurhash' => $expectedBlurhash]);
     }
 
-    public function test_regenerate_blurhash_returns_false_and_clears_hash_if_file_missing()
+    public function test_regenerate_blurhash_returns_false_and_keeps_hash_if_file_cannot_be_read()
+    {
+        $this->asAdmin();
+        $imgDetails = $this->files->uploadGalleryImageToPage($this, $this->entities->page());
+        $image = Image::findOrFail($imgDetails['response']->id);
+        $existingBlurhash = $image->blurhash;
+        $this->assertNotNull($existingBlurhash);
+
+        $this->files->deleteAtRelativePath($imgDetails['path']);
+        $result = $this->app->make(ImageService::class)->regenerateBlurhash($image);
+
+        $this->assertFalse($result);
+        $this->assertDatabaseHas('images', ['id' => $image->id, 'blurhash' => $existingBlurhash]);
+    }
+
+    public function test_regenerate_blurhash_clears_hash_if_file_data_cannot_be_decoded()
     {
         $this->asAdmin();
         $imgDetails = $this->files->uploadGalleryImageToPage($this, $this->entities->page());
         $image = Image::findOrFail($imgDetails['response']->id);
         $this->assertNotNull($image->blurhash);
 
-        $this->files->deleteAtRelativePath($imgDetails['path']);
+        file_put_contents($this->files->relativeToFullPath($imgDetails['path']), 'not-an-image');
         $result = $this->app->make(ImageService::class)->regenerateBlurhash($image);
+        $this->files->deleteAtRelativePath($imgDetails['path']);
 
         $this->assertFalse($result);
         $this->assertDatabaseHas('images', ['id' => $image->id, 'blurhash' => null]);
