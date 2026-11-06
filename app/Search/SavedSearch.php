@@ -32,6 +32,7 @@ class SavedSearch extends Model
 
     /**
      * Get the URL to run this search within the main search interface.
+     * @return string
      */
     public function getUrl(): string
     {
@@ -40,6 +41,7 @@ class SavedSearch extends Model
 
     /**
      * Check if this saved search represents the given search options.
+     * @return bool
      */
     public function matchesOptions(SearchOptions $options): bool
     {

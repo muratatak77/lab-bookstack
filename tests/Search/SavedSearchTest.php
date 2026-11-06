@@ -3,6 +3,8 @@
 namespace Tests\Search;
 
 use BookStack\Search\SavedSearch;
+use BookStack\Search\SavedSearchRepo;
+use BookStack\Users\Models\User;
 use Tests\TestCase;
 
 class SavedSearchTest extends TestCase
@@ -95,6 +97,33 @@ class SavedSearchTest extends TestCase
         ]);
         $resp->assertSessionHasNoErrors();
         $this->assertDatabaseHas('saved_searches', ['user_id' => $editor->id, 'name' => 'Admin search']);
+    }
+
+    public function test_duplicate_name_constraint_failure_redirects_back_with_name_error()
+    {
+        $editor = $this->users->editor();
+        SavedSearch::factory()->create(['user_id' => $editor->id, 'name' => 'My search']);
+
+        // Drop the uniqueness rule to simulate a concurrent save which passed validation
+        // before the existing search was written, so the database constraint is what fails.
+        $this->app->instance(SavedSearchRepo::class, new class () extends SavedSearchRepo {
+            public function validationRules(User $user, ?int $ignoreId = null, bool $required = true): array
+            {
+                $rules = parent::validationRules($user, $ignoreId, $required);
+                $rules['name'] = array_values(array_filter($rules['name'], 'is_string'));
+
+                return $rules;
+            }
+        });
+
+        $resp = $this->actingAs($editor)->from('/search?term=cats')->post('/search/saved', [
+            'name' => 'My search',
+            'query' => 'cats',
+        ]);
+
+        $resp->assertRedirect('/search?term=cats');
+        $resp->assertSessionHasErrors(['name' => 'The name has already been taken.']);
+        $this->assertEquals(1, SavedSearch::query()->where('user_id', '=', $editor->id)->count());
     }
 
     public function test_saving_requires_a_usable_query()

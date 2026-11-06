@@ -34,6 +34,7 @@ class SavedSearchRepo
     /**
      * Find a saved search, by ID, which belongs to the given user.
      * Throws a not-found exception if not found or not owned by the user.
+     * @return SavedSearch
      */
     public function findForUserOrFail(User $user, int $id): SavedSearch
     {
@@ -42,6 +43,7 @@ class SavedSearchRepo
 
     /**
      * Create a new saved search for the given user.
+     * @return SavedSearch
      */
     public function create(User $user, string $name, string $query): SavedSearch
     {
@@ -57,6 +59,7 @@ class SavedSearchRepo
     /**
      * Update the name and/or query of an existing saved search.
      * @param array{name?: string, query?: string} $input
+     * @return SavedSearch
      */
     public function update(SavedSearch $search, array $input): SavedSearch
     {
@@ -85,10 +88,13 @@ class SavedSearchRepo
      * Get the validation rules for saved search input.
      * When updating, the ID of the existing search should be provided
      * so that its own name is ignored for uniqueness checks.
+     * When not required (partial updates) each field may be omitted, but if
+     * provided it must not be empty, since empty strings skip non-implicit rules.
+     * @return array<string, array<int, mixed>>
      */
     public function validationRules(User $user, ?int $ignoreId = null, bool $required = true): array
     {
-        $presence = $required ? ['required'] : [];
+        $presence = $required ? ['required'] : ['sometimes', 'required'];
 
         return [
             'name'  => [...$presence, 'string', 'min:1', 'max:180', (new Unique('saved_searches', 'name'))->where('user_id', $user->id)->ignore($ignoreId)],

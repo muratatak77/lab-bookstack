@@ -3,6 +3,7 @@
 namespace BookStack\Search;
 
 use BookStack\Http\Controller;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class SavedSearchController extends Controller
@@ -14,8 +15,9 @@ class SavedSearchController extends Controller
 
     /**
      * Save a new search for the current user.
+     * @return RedirectResponse
      */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         $this->preventGuestAccess();
         $user = user();
@@ -30,8 +32,9 @@ class SavedSearchController extends Controller
 
     /**
      * Delete a saved search belonging to the current user.
+     * @return RedirectResponse
      */
-    public function destroy(int $id)
+    public function destroy(int $id): RedirectResponse
     {
         $this->preventGuestAccess();
 

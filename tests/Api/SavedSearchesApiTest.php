@@ -109,6 +109,23 @@ class SavedSearchesApiTest extends TestCase
         app(SavedSearchRepo::class)->create($editor, 'Existing', 'cats');
     }
 
+    public function test_duplicate_name_constraint_failure_on_update_returns_validation_error()
+    {
+        $editor = $this->users->editor();
+        SavedSearch::factory()->create(['user_id' => $editor->id, 'name' => 'Taken']);
+        $search = SavedSearch::factory()->create(['user_id' => $editor->id, 'name' => 'Mine']);
+
+        // Simulates a concurrent rename onto a name which was taken after validation passed.
+        try {
+            app(SavedSearchRepo::class)->update($search, ['name' => 'Taken']);
+            $this->fail('Expected a ValidationException');
+        } catch (ValidationException $exception) {
+            $this->assertEquals(['name' => ['The name has already been taken.']], $exception->errors());
+        }
+
+        $this->assertDatabaseHas('saved_searches', ['id' => $search->id, 'name' => 'Mine']);
+    }
+
     public function test_create_allows_name_used_by_another_user()
     {
         SavedSearch::factory()->create(['user_id' => $this->users->admin()->id, 'name' => 'Shared name']);
@@ -170,6 +187,35 @@ class SavedSearchesApiTest extends TestCase
             'id' => $search->id,
             'name' => 'Cat chapters',
             'query' => 'cats {type:chapter}',
+        ]);
+    }
+
+    public function test_update_rejects_empty_name_or_query()
+    {
+        $editor = $this->users->editor();
+        $search = SavedSearch::factory()->create([
+            'user_id' => $editor->id,
+            'name' => 'Cat pages',
+            'query' => 'cats {type:page}',
+        ]);
+        $this->actingAsForApi($editor);
+
+        $resp = $this->putJson("{$this->baseEndpoint}/{$search->id}", ['name' => '']);
+        $resp->assertStatus(422);
+        $resp->assertJsonValidationErrors(['name'], 'error.validation');
+
+        $resp = $this->putJson("{$this->baseEndpoint}/{$search->id}", ['name' => '   ']);
+        $resp->assertStatus(422);
+        $resp->assertJsonValidationErrors(['name'], 'error.validation');
+
+        $resp = $this->putJson("{$this->baseEndpoint}/{$search->id}", ['query' => '']);
+        $resp->assertStatus(422);
+        $resp->assertJsonValidationErrors(['query'], 'error.validation');
+
+        $this->assertDatabaseHas('saved_searches', [
+            'id' => $search->id,
+            'name' => 'Cat pages',
+            'query' => 'cats {type:page}',
         ]);
     }
 

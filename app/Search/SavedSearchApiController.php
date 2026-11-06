@@ -38,6 +38,7 @@ class SavedSearchApiController extends ApiController
 
     /**
      * Get a listing of the saved searches for the current user.
+     * @return JsonResponse
      */
     public function list(): JsonResponse
     {
@@ -51,6 +52,7 @@ class SavedSearchApiController extends ApiController
     /**
      * Save a new search for the current user.
      * Search names must be unique across the saved searches of the user.
+     * @return JsonResponse
      */
     public function create(Request $request): JsonResponse
     {
@@ -62,6 +64,7 @@ class SavedSearchApiController extends ApiController
 
     /**
      * Read the details of a single saved search.
+     * @return JsonResponse
      */
     public function read(string $id): JsonResponse
     {
@@ -72,6 +75,7 @@ class SavedSearchApiController extends ApiController
 
     /**
      * Update the name and/or query of a saved search.
+     * @return JsonResponse
      */
     public function update(Request $request, string $id): JsonResponse
     {
@@ -85,6 +89,7 @@ class SavedSearchApiController extends ApiController
 
     /**
      * Delete a saved search.
+     * @return Response
      */
     public function delete(string $id): Response
     {
