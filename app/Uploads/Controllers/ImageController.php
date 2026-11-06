@@ -137,7 +137,7 @@ class ImageController extends Controller
     /**
      * Rebuild the thumbnails for the given image.
      */
-    public function rebuildThumbnails(string $id)
+    public function rebuildThumbnails(string $id)  // changed on the base while this PR was open (1793990521)
     {
         $image = $this->imageRepo->getById($id);
         $this->checkImagePermission($image);
